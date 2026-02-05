@@ -1,4 +1,4 @@
-# Automated Biomedical Relation Extraction
+# Hybrid Transformer Framework for Biomedical Relation Extraction
 
 ## Overview
 
