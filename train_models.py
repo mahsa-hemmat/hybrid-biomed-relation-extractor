@@ -33,7 +33,8 @@ def compute_metrics(pred):
     # Weighted metrics (Good for general performance)
     precision_w, recall_w, f1_w, _ = precision_recall_fscore_support(labels, preds, average='weighted', zero_division=0)
     
-
+    # Macro metrics (Crucial for minority classes in project)
+    precision_m, recall_m, f1_m, _ = precision_recall_fscore_support(labels, preds, average='macro', zero_division=0)
 
     
     acc = accuracy_score(labels, preds)
