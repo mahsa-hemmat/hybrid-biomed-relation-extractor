@@ -33,8 +33,8 @@ def compute_metrics(pred):
     # Weighted metrics (Good for general performance)
     precision_w, recall_w, f1_w, _ = precision_recall_fscore_support(labels, preds, average='weighted', zero_division=0)
     
-    # Macro metrics (Crucial for minority classes in your project)
-    precision_m, recall_m, f1_m, _ = precision_recall_fscore_support(labels, preds, average='macro', zero_division=0)
+
+
     
     acc = accuracy_score(labels, preds)
     
@@ -80,7 +80,7 @@ def train_single_model(model_name, model_id, raw_dataset, epochs, lr):
     # Initialize Data Collator for Dynamic Padding
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     
-    # 4. Load Model
+    # Load Model
     print(f"[{model_name}] Initializing Model...")
     model = AutoModelForSequenceClassification.from_pretrained(
         model_id, 
@@ -91,7 +91,7 @@ def train_single_model(model_name, model_id, raw_dataset, epochs, lr):
     # Resize embedding layer to fit [E1] tokens
     model.resize_token_embeddings(len(tokenizer))
     
-    # 5. Training Args
+    # Training Args
     training_args = TrainingArguments(
     output_dir=output_dir,
     num_train_epochs=epochs,
