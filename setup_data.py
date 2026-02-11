@@ -18,9 +18,9 @@ BIORED_URL = "https://ftp.ncbi.nlm.nih.gov/pub/lu/BioRED/BIORED.zip"
 
 def download_file(url, desc):
     """Downloads a file with a progress bar."""
-    print(f"⬇Downloading {desc}...")
-    headers = {'User-Agent': 'Mozilla/5.0'} # Helps avoid 403/429 errors
+    print(f"Downloading {desc}...")
     
+    headers = {'User-Agent': 'Mozilla/5.0'} # Helps avoid 403/429 errors    
     try:
         response = requests.get(url, stream=True, headers=headers)
         response.raise_for_status()
