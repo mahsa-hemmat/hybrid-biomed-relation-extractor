@@ -1,105 +1,90 @@
 import argparse
+import logging
 import subprocess
 import os
 import sys
 
 # --- CONFIGURATION ---
-#BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.getcwd()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("main")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 SCRIPTS = {
-    "parser": os.path.join(BASE_DIR, 'data_parser.py'),  
-    "preprocess": os.path.join(BASE_DIR, 'preprocess.py'),  
-    "train": os.path.join(BASE_DIR, 'train_models.py'),   
-    "evaluate": os.path.join(BASE_DIR, 'evaluate_models.py'),        
-    "predict": os.path.join(BASE_DIR, 'run_inference.py'),  
-    "ensemble": os.path.join(BASE_DIR, 'run_ensemble_logic.py'), 
-    "validate_hard_cases": os.path.join(BASE_DIR, 'run_biomistral_judge.py'),   
-    "results_report": os.path.join(BASE_DIR, 'csvToJson.py'),   
+    "parser":              os.path.join(BASE_DIR, "data_parser.py"),
+    "preprocess":          os.path.join(BASE_DIR, "preprocess.py"),
+    "train":               os.path.join(BASE_DIR, "train_models.py"),
+    "evaluate":            os.path.join(BASE_DIR, "evaluate_models.py"),
+    "predict":             os.path.join(BASE_DIR, "run_inference.py"),
+    "ensemble":            os.path.join(BASE_DIR, "run_ensemble_logic.py"),
+    "validate_hard_cases": os.path.join(BASE_DIR, "run_biomistral_judge.py"),
+    "results_report":      os.path.join(BASE_DIR, "csvToJson.py"),
 }
 
-def run_script(script_name, args=[]):
-    """Executes a python script as a subprocess."""
-    if not os.path.exists(script_name):
-        print(f"Error: Could not find script '{script_name}'")
-        print(f"Please make sure it is in the same folder as main.py")
+def run_script(script_path: str, extra_args: list[str] = ()) -> None:
+    """Execute *script_path* as a subprocess and propagate exit codes."""
+    if not os.path.exists(script_path):
+        log.error("Script not found: %s", script_path)
         sys.exit(1)
 
-    print(f"\ Starting module: {script_name}...")
-    print(f"Arguments: {args}")
-    print("-" * 50)
-    
-    # Construct command: python script.py [args]
-    cmd = [sys.executable, script_name] + args
-    
+    cmd = [sys.executable, script_path] + list(extra_args)
+    log.info("Starting: %s", " ".join(cmd))
+    log.info("-" * 60)
+
     try:
-        # Run and wait for completion
         subprocess.check_call(cmd)
-        print("-" * 50)
-        print(f"Module '{script_name}' finished successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"\nError: Module '{script_name}' failed with exit code {e.returncode}.")
-        sys.exit(e.returncode)
+        log.info("-" * 60)
+        log.info("Finished: %s", script_path)
+    except subprocess.CalledProcessError as exc:
+        log.error("Module failed (exit code %d): %s", exc.returncode, script_path)
+        sys.exit(exc.returncode)
+        
 
-def main():
-    parser = argparse.ArgumentParser(description="Biomedical Relation Extraction System")
-    subparsers = parser.add_subparsers(dest="mode", help="Select the pipeline stage", required=True)
-    
-    # Parser Mode
-    parser_pars = subparsers.add_parser("parser", help="Parse RegulaTome/BioRED and create training data")
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Biomedical Relation Extraction — pipeline orchestrator",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="mode", required=True, help="Pipeline stage")
 
-    # Preprocess Mode
-    parser_prep = subparsers.add_parser("preprocess", help="Preprocess test or raw data for relation extraction")
-    parser_prep.add_argument("--file", type=str, default="data/results_filtered.csv", help="Data file path")
+    sub.add_parser("parser",  help="Parse RegulaTome/BioRED and build training data")
 
+    p_prep = sub.add_parser("preprocess", help="Add entity markers to a raw CSV")
+    p_prep.add_argument("--file", default="data/results_filtered.csv", help="Input CSV path")
 
-    # Train Mode
-    parser_train = subparsers.add_parser("train", help="Train the Bert models on processed data")
-    parser_train.add_argument("--epochs", type=str, default="6", help="Number of training epochs")
-    parser_train.add_argument("--lr", type=str, default="4e-6", help="Model Learning Rate")
-    
-    # Evaluate/Benchmark Mode
-    parser_eval = subparsers.add_parser("evaluate", help="Run model comparison and ensemble evaluation")
-    
-    # Predict Mode
-    parser_pred = subparsers.add_parser("predict", help="Extract relations from a new csv file")
-    parser_pred.add_argument("--input", type=str, default="data/processed_data.csv", help="Path to input file to analyze")
-    
-    # Run Ensemble 
-    parser_ens = subparsers.add_parser("ensemble", help="Run ensemble logic")
+    p_train = sub.add_parser("train", help="Fine-tune BERT models on processed data")
+    p_train.add_argument("--epochs", default="6",    help="Training epochs (default: 6)")
+    p_train.add_argument("--lr",     default="2e-5", help="Learning rate (default: 2e-5)")
 
-    # Run Biomistral For Hard Cases
-    parser_ens = subparsers.add_parser("validate_hard_cases", help="Run validation by biomistral")
+    sub.add_parser("evaluate",            help="Evaluate trained models on the test set")
 
-    # Run Biomistral For Hard Cases
-    parser_res = subparsers.add_parser("results_report", help="Get final results from all models and the whole pipeline")
+    p_pred = sub.add_parser("predict",    help="Run inference on a new CSV file")
+    p_pred.add_argument("--input", default="data/processed_data.csv", help="Input CSV path")
 
+    sub.add_parser("ensemble",            help="Apply majority-vote ensemble logic")
+    sub.add_parser("validate_hard_cases", help="Adjudicate hard cases with BioMistral-7B")
+    sub.add_parser("results_report",      help="Generate final JSON report")
 
     args = parser.parse_args()
 
-    # --- DISPATCHER ---
-    if args.mode == "parser":
-        run_script(SCRIPTS["parser"])
+    dispatch = {
+        "parser":              (SCRIPTS["parser"],              []),
+        "preprocess":          (SCRIPTS["preprocess"],          ["--file", args.file] if args.mode == "preprocess" else []),
+        "train":               (SCRIPTS["train"],               ["--epochs", args.epochs, "--lr", args.lr] if args.mode == "train" else []),
+        "evaluate":            (SCRIPTS["evaluate"],            []),
+        "predict":             (SCRIPTS["predict"],             ["--input", args.input] if args.mode == "predict" else []),
+        "ensemble":            (SCRIPTS["ensemble"],            []),
+        "validate_hard_cases": (SCRIPTS["validate_hard_cases"], []),
+        "results_report":      (SCRIPTS["results_report"],      []),
+    }
 
-    elif args.mode == "preprocess":
-        run_script(SCRIPTS["preprocess"],  ["--file", args.file])
-        
-    elif args.mode == "train":
-        run_script(SCRIPTS["train"],  ["--epochs", args.epochs, "--lr", args.lr])
-        
-    elif args.mode == "evaluate":
-        run_script(SCRIPTS["evaluate"])
-        
-    elif args.mode == "predict":
-        run_script(SCRIPTS["predict"], ["--input", args.input])
+    script, extra = dispatch[args.mode]
+    run_script(script, extra)
 
-    elif args.mode == "ensemble":
-        run_script(SCRIPTS["ensemble"])
-    
-    elif args.mode == "validate_hard_cases":
-        run_script(SCRIPTS["validate_hard_cases"])
-
-    elif args.mode == "results_report":
-        run_script(SCRIPTS["results_report"])
 
 if __name__ == "__main__":
     main()
